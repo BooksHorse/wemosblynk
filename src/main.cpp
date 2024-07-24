@@ -8,6 +8,9 @@
 
 #define BLYNK_PRINT Serial
 
+#include <U8g2lib.h>
+U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 
+
 void setup();
 void loop();
 void updatePattern(int);
@@ -130,7 +133,7 @@ class Device
     }
 };
 
-char *transformIntoChar(Device *dev)
+char *transformIntoChar(Device *dev,bool display)
 {
     char *result = (char *)malloc(20 * sizeof(char));
     char timerstr[10];
@@ -154,11 +157,21 @@ char *transformIntoChar(Device *dev)
     switch (state)
     {
     case false: {
+        if (display) {
+            sprintf(result, "X %s", timerstr);
+        } 
+        else {
         sprintf(result, "✘ %s", timerstr);
+        }
         break;
     }
     case true: {
+        if (display) {
+            sprintf(result, "/ %s", timerstr);
+        }
+        else {
         sprintf(result, "✓ %s", timerstr);
+        }
         break;
     }
     }
@@ -175,13 +188,30 @@ class DeviceStatus
   public:
     char *getStatusAsString()
     {
-        char *dev0s = transformIntoChar(dev0);
-        char *dev1s = transformIntoChar(dev1);
-        char *dev2s = transformIntoChar(dev2);
+        char *dev0s = transformIntoChar(dev0,false);
+        char *dev1s = transformIntoChar(dev1,false);
+        char *dev2s = transformIntoChar(dev2,false);
         sprintf(statusString, "0: %s,1: %s,2: %s\n", dev0s, dev1s, dev2s);
         free(dev0s);
         free(dev1s);
         free(dev2s);
+        char statusStringdisplay0[64];
+        char statusStringdisplay1[64];
+        char statusStringdisplay2[64];
+        char *dev0sd = transformIntoChar(dev0,true);
+        char *dev1sd = transformIntoChar(dev1,true);
+        char *dev2sd = transformIntoChar(dev2,true);
+        sprintf(statusStringdisplay0, "0: %s\n", dev0sd);
+        sprintf(statusStringdisplay1, "1: %s\n", dev1sd);
+        sprintf(statusStringdisplay2, "2: %s\n", dev2sd);
+        free(dev0sd);
+        free(dev1sd);
+        free(dev2sd);
+        u8x8.clear();
+        u8x8.draw1x2String(0, 0, statusStringdisplay0);
+        u8x8.draw1x2String(0,2,statusStringdisplay1);
+        u8x8.draw1x2String(0,4,statusStringdisplay2);
+
         return statusString;
     }
     DeviceStatus(Device *btn0, Device *btn1, Device *btn2)
@@ -260,6 +290,9 @@ BlynkTimer timerStatusUpdateTask;
 #define S0Pin d7
 #define S1Pin d5
 
+#define WIFI_SSID "kitakitan"
+#define WIFI_PASSWORD "bocchichan"
+
 class bocchiMultiplex
 {
   public:
@@ -316,6 +349,10 @@ void turnoff(uint8_t dev)
 
 void setup()
 {
+    u8x8.begin();
+    u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);
+    u8x8.clear();
+    u8x8.println("Initializing");
     dev0.onTimerExpire(turnoff);
     dev1.onTimerExpire(turnoff);
     dev2.onTimerExpire(turnoff);
@@ -329,6 +366,7 @@ void setup()
     // put your setup code here, to run once:
     Serial.begin(9600);
     Serial.println("asdad");
+    u8x8.print(".");
     if (latchPin.lock(1) || clockPin.lock(1) || dataPin.lock(1))
     {
         pinMode(latchPin.pin, OUTPUT);
@@ -348,15 +386,18 @@ void setup()
         digitalWrite(latchPin.pin, HIGH);
         latchPin.unlock();
     };
-
+    u8x8.println(".");
     // btn0.setCallbackOnStateUpdate(update0);
     // btn1.setCallbackOnStateUpdate(update1);
     // btn2.setCallbackOnStateUpdate(update2);
-    Blynk.begin(BLYNK_AUTH_TOKEN, "kitakitan", "bocchichan");
+    u8x8.println("Connecting WIFI");
+    u8x8.println(WIFI_SSID);
+    Blynk.begin(BLYNK_AUTH_TOKEN, WIFI_SSID, WIFI_PASSWORD);
     Blynk.virtualWrite(V1, 0);
     Blynk.virtualWrite(V2, 0);
     Blynk.virtualWrite(V3, 0);
     Blynk.virtualWrite(V4, 0);
+    u8x8.clear();
 }
 
 void loop()
